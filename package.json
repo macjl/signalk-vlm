@@ -1,0 +1,24 @@
+{
+  "name": "signalk-vlm",
+  "version": "1.0.0",
+  "description": "VLM plugin for Signal K",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/macjl/signalk-vlm.git"
+  },
+  "keywords": [
+    "signalk-node-server-plugin"
+  ],
+  "author": "Jean-Laurent Girod",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/macjl/signalk-vlm/issues"
+  },
+  "homepage": "https://github.com/itemir/signalk-vlm",
+  "dependencies": {
+  }
+}
