@@ -80,6 +80,10 @@ module.exports = function(app) {
             path: 'navigation.speedOverGround',
             value: resBody.BSP / 1.943844,
           },
+					{
+            path: 'navigation.speedTroughWater',
+            value: resBody.BSP / 1.943844,
+          },
           {
             path: 'navigation.courseOverGroundTrue',
             value: resBody.HDG / 57.29578,
@@ -92,12 +96,20 @@ module.exports = function(app) {
             path: 'environment.wind.speedTrue',
             value: resBody.TWS / 1.943844,
           },
+					{
+            path: 'environment.wind.speedThroughWater',
+            value: resBody.TWS / 1.943844,
+          },
           {
             path: 'environment.wind.directionTrue',
             value: resBody.TWD / 57.29578,
           },
           {
             path: 'environment.wind.angleTrueGround',
+            value: resBody.TWA / 57.29578,
+          },
+					{
+            path: 'environment.wind.angleTrueWater',
             value: resBody.TWA / 57.29578,
           },
         ]
