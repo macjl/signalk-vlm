@@ -18,7 +18,5 @@
   "bugs": {
     "url": "https://github.com/macjl/signalk-vlm/issues"
   },
-  "homepage": "https://github.com/itemir/signalk-vlm",
-  "dependencies": {
-  }
+  "homepage": "https://github.com/itemir/signalk-vlm"
 }
