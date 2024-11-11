@@ -50,6 +50,9 @@ module.exports = function(app) {
     }
     const basicauth = btoa(options.login + ':' + options.password);
 
+    const degToRad = deg => (deg * Math.PI) / 180.0;
+    const knToMs = kn => (kn * 0.51444);
+
     const getBoatInfo = async (options = {}) => {
       app.debug('Get vBoat informations');
       const res = await fetch('https://www.v-l-m.org/ws/boatinfo.php', {
@@ -68,6 +71,15 @@ module.exports = function(app) {
       } else {
         const resBody = await res.json();
         app.debug(`Received: ${JSON.stringify(resBody)}`);
+	
+	let TWA = degToRad( resBody.TWA );
+	let HDG = degToRad( resBody.HDG );
+	let TWD = degToRad( resBody.TWD );
+	let SOG = knToMs( resBody.BSP );
+	let TWS = knToMs( resBody.TWS );
+
+        let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
+	let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
 
         values = [{
             path: 'navigation.position',
@@ -78,39 +90,47 @@ module.exports = function(app) {
           },
           {
             path: 'navigation.speedOverGround',
-            value: resBody.BSP / 1.943844,
+            value: SOG,
           },
-					{
-            path: 'navigation.speedTroughWater',
-            value: resBody.BSP / 1.943844,
+	  {
+            path: 'navigation.speedThroughWater',
+            value: SOG,
           },
           {
             path: 'navigation.courseOverGroundTrue',
-            value: resBody.HDG / 57.29578,
+            value: HDG,
           },
           {
             path: 'navigation.headingTrue',
-            value: resBody.HDG / 57.29578,
+            value: HDG,
           },
           {
             path: 'environment.wind.speedTrue',
-            value: resBody.TWS / 1.943844,
+            value: TWS,
           },
 					{
             path: 'environment.wind.speedThroughWater',
-            value: resBody.TWS / 1.943844,
+            value: TWS,
           },
           {
             path: 'environment.wind.directionTrue',
-            value: resBody.TWD / 57.29578,
+            value: TWD,
           },
           {
             path: 'environment.wind.angleTrueGround',
-            value: resBody.TWA / 57.29578,
+            value: TWA,
           },
 					{
             path: 'environment.wind.angleTrueWater',
-            value: resBody.TWA / 57.29578,
+            value: TWA,
+          },
+          {
+            path: 'environment.wind.angleApparent',
+            value: AWA,
+          },
+          {
+            path: 'environment.wind.speedApparent',
+            value: AWS,
           },
         ]
       }
