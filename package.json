@@ -1,6 +1,6 @@
 {
   "name": "signalk-vlm",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "VLM plugin for Signal K",
   "main": "index.js",
   "scripts": {
@@ -18,5 +18,5 @@
   "bugs": {
     "url": "https://github.com/macjl/signalk-vlm/issues"
   },
-  "homepage": "https://github.com/itemir/signalk-vlm"
+  "homepage": "https://github.com/macjl/signalk-vlm"
 }
