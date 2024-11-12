@@ -141,7 +141,7 @@ module.exports = function(app) {
 
     dataGet = setInterval(function() {
       getBoatInfo();
-    }, 60 * 1000);
+    }, 300 * 1000);
 
     getBoatInfo();
 
