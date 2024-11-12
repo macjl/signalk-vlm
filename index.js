@@ -71,47 +71,49 @@ module.exports = function(app) {
       } else {
         const resBody = await res.json();
         app.debug(`Received: ${JSON.stringify(resBody)}`);
-	
-	let TWA = degToRad( resBody.TWA );
-	let HDG = degToRad( resBody.HDG );
-	let TWD = degToRad( resBody.TWD );
-	let SOG = knToMs( resBody.BSP );
-	let TWS = knToMs( resBody.TWS );
 
-        let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
-	let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
+	let LAT = resBody.LAT / 1000;
+	let LON = resBody.LON / 1000;
+	let SOG = knToMs( resBody.BSP );
+	let COG = degToRad( resBody.HDG );
+	let TWS = knToMs( resBody.TWS );
+	let TWD = degToRad( resBody.TWD );
+	let TWA = degToRad( resBody.TWA );
+
+        //let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
+	//let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
 
         values = [{
             path: 'navigation.position',
             value: {
-              'longitude': resBody.LON / 1000,
-              'latitude': resBody.LAT / 1000,
+              'latitude': LAT,
+              'longitude': LON,
             }
           },
           {
             path: 'navigation.speedOverGround',
             value: SOG,
           },
-	  {
+	  /*{
             path: 'navigation.speedThroughWater',
             value: SOG,
-          },
+          },*/
           {
             path: 'navigation.courseOverGroundTrue',
-            value: HDG,
+            value: COG,
           },
-          {
+          /*{
             path: 'navigation.headingTrue',
             value: HDG,
-          },
+          },*/
           {
             path: 'environment.wind.speedTrue',
             value: TWS,
           },
-					{
+          /*{
             path: 'environment.wind.speedThroughWater',
             value: TWS,
-          },
+          },*/
           {
             path: 'environment.wind.directionTrue',
             value: TWD,
@@ -120,7 +122,7 @@ module.exports = function(app) {
             path: 'environment.wind.angleTrueGround',
             value: TWA,
           },
-					{
+          /*{
             path: 'environment.wind.angleTrueWater',
             value: TWA,
           },
@@ -131,7 +133,7 @@ module.exports = function(app) {
           {
             path: 'environment.wind.speedApparent',
             value: AWS,
-          },
+          },*/
         ]
       }
     }
