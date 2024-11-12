@@ -1,7 +1,7 @@
 {
   "name": "signalk-vlm",
-  "version": "0.3.1",
-  "description": "VLM plugin for Signal K",
+  "version": "0.3.2",
+  "description": "Plugin for SignalK to retrieve your Virtual Boat datas from Virtual Loup-de-Mer (https://www.v-l-m.org)",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
