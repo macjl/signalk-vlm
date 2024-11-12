@@ -60,6 +60,7 @@ module.exports = function(app) {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Basic ' + basicauth,
+	  'User-Agent': 'signalk-vlm/0.3.3',
         },
         body: new URLSearchParams({
           forcefmt: 'json',
