@@ -85,7 +85,9 @@ module.exports = function(app) {
 	COG = degToRad( resBody.HDG );
 	TWS = knToMs( resBody.TWS );
 	TWD = degToRad( resBody.TWD );
-	TWA = degToRad( resBody.TWA );
+        // Correct the TWA Bug
+	//TWA = degToRad( resBody.TWA );
+	TWA = degToRad( ( 180 + resBody.TWD - resBody.HDG) % 360 -180 );
 	LOG = nMToM( resBody.LOC );
 	PIM = resBody.PIM;
 	if (( PIM == 1 ) || ( PIM == 2 )) {
@@ -126,7 +128,7 @@ module.exports = function(app) {
       else if ( PIM == 2 )
         piparms = piparms.concat( [
 	  { path: 'steering.autopilot.state', value: "wind" },
-          { path: 'steering.autopilot.target.windAngleTrueGround', value: PIT }
+          { path: 'steering.autopilot.target.windAngleTrueGround', value: - PIT }
 	]);
       else if ( PIM == 3 )
         piparms = piparms.concat( [
