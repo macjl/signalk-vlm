@@ -16,9 +16,8 @@
 
 module.exports = function(app) {
   var plugin = {};
-  var dataGet;
-  var dataPublish;
-  var values = [];
+  var dataGet, dataPublish;
+  var LAT, LON, SOG, COG, TWS, TWD, TWA;
 
   plugin.id = "signalk-vlm";
   plugin.name = "VLM";
@@ -48,9 +47,11 @@ module.exports = function(app) {
       app.error('Login, password and boat# are required')
       return;
     }
+
     const basicauth = btoa(options.login + ':' + options.password);
 
     const degToRad = deg => (deg * Math.PI) / 180.0;
+
     const knToMs = kn => (kn * 0.51444);
 
     const getBoatInfo = async (options = {}) => {
@@ -73,87 +74,44 @@ module.exports = function(app) {
         const resBody = await res.json();
         app.debug(`Received: ${JSON.stringify(resBody)}`);
 
-	let LAT = resBody.LAT / 1000;
-	let LON = resBody.LON / 1000;
-	let SOG = knToMs( resBody.BSP );
-	let COG = degToRad( resBody.HDG );
-	let TWS = knToMs( resBody.TWS );
-	let TWD = degToRad( resBody.TWD );
-	let TWA = degToRad( resBody.TWA );
+	LAT = resBody.LAT / 1000;
+	LON = resBody.LON / 1000;
+	SOG = knToMs( resBody.BSP );
+	COG = degToRad( resBody.HDG );
+	TWS = knToMs( resBody.TWS );
+	TWD = degToRad( resBody.TWD );
+	TWA = degToRad( resBody.TWA );
 
         //let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
 	//let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
-
-        values = [{
-            path: 'navigation.position',
-            value: {
-              'latitude': LAT,
-              'longitude': LON,
-            }
-          },
-          {
-            path: 'navigation.speedOverGround',
-            value: SOG,
-          },
-	  /*{
-            path: 'navigation.speedThroughWater',
-            value: SOG,
-          },*/
-          {
-            path: 'navigation.courseOverGroundTrue',
-            value: COG,
-          },
-          /*{
-            path: 'navigation.headingTrue',
-            value: HDG,
-          },*/
-          {
-            path: 'environment.wind.speedTrue',
-            value: TWS,
-          },
-          /*{
-            path: 'environment.wind.speedThroughWater',
-            value: TWS,
-          },*/
-          {
-            path: 'environment.wind.directionTrue',
-            value: TWD,
-          },
-          {
-            path: 'environment.wind.angleTrueGround',
-            value: TWA,
-          },
-          /*{
-            path: 'environment.wind.angleTrueWater',
-            value: TWA,
-          },
-          {
-            path: 'environment.wind.angleApparent',
-            value: AWA,
-          },
-          {
-            path: 'environment.wind.speedApparent',
-            value: AWS,
-          },*/
-        ]
       }
     }
 
+    const publishBoatInfo = () => {
+      let values = [{
+          path: 'navigation.position', value: { 'latitude': LAT, 'longitude': LON } 
+        },{
+          path: 'navigation.speedOverGround', value: SOG
+        },{
+          path: 'navigation.courseOverGroundTrue', value: COG
+        },{
+          path: 'environment.wind.speedTrue', value: TWS
+        },{
+          path: 'environment.wind.directionTrue', value: TWD
+        },{
+          path: 'environment.wind.angleTrueGround', value: TWA
+        }];
 
-    dataGet = setInterval(function() {
-      getBoatInfo();
-    }, 300 * 1000);
-
-    getBoatInfo();
-
-    dataPublish = setInterval(function() {
       app.handleMessage(plugin.id, {
         updates: [{
           values: values
         }]
       });
-    }, 1 * 1000);
+    }
 
+    getBoatInfo();
+    dataGet = setInterval( getBoatInfo, 300 * 1000 );
+    dataPublish = setInterval( publishBoatInfo, 1 * 1000);
   }
 
   plugin.stop = function() {
