@@ -87,6 +87,16 @@ module.exports = function(app) {
 	TWD = degToRad( resBody.TWD );
 	TWA = degToRad( resBody.TWA );
 	LOG = nMToM( resBody.LOC );
+	PIM = resBody.PIM;
+	if (( PIM == 1 ) || ( PIM == 2 )) {
+	  PIT = degToRad(resBody.PIP);
+	}
+
+        app.handleMessage(plugin.id, {
+          updates: [{
+            values: [{ path: 'name', value: resBody.IDB }]
+          }]
+        });
 
         //let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
 	//let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
@@ -105,6 +115,35 @@ module.exports = function(app) {
       return LOG + dlog
     }
 
+    const piParms = () => {
+      let piparms = [];
+
+      if ( PIM == 1 )
+        piparms = piparms.concat( [
+	  { path: 'steering.autopilot.state', value: "auto" },
+	  { path: 'steering.autopilot.target.headingTrue', value: PIT }
+	]);
+      else if ( PIM == 2 )
+        piparms = piparms.concat( [
+	  { path: 'steering.autopilot.state', value: "wind" },
+          { path: 'steering.autopilot.target.windAngleTrueGround', value: PIT }
+	]);
+      else if ( PIM == 3 )
+        piparms = piparms.concat( [
+	  { path: 'steering.autopilot.state', value: "track" },
+	]);
+      else if ( PIM == 4 )
+        piparms = piparms.concat( [
+	  { path: 'steering.autopilot.state', value: "vmg" },
+	]);
+      else if ( PIM == 5 )
+        piparms = piparms.concat( [
+	  { path: 'steering.autopilot.state', value: "vbvmg" },
+	]);
+
+      return piparms
+    }
+
     const publishBoatInfo = () => {
       let values = [{
           path: 'navigation.position', value: actualPos()
@@ -121,6 +160,7 @@ module.exports = function(app) {
         },{
           path: 'navigation.trip.log', value: actualTripLog() 
         }];
+      values = values.concat(piParms());
 
       app.handleMessage(plugin.id, {
         updates: [{
