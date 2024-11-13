@@ -100,6 +100,11 @@ module.exports = function(app) {
       return { 'latitude': LAT + dlat, 'longitude': LON + dlon }
     }
 
+    const actualTripLog = () => {
+      const dlog = SOG * (Date.now() - timestamp) / 1000
+      return LOG + dlog
+    }
+
     const publishBoatInfo = () => {
       let values = [{
           path: 'navigation.position', value: actualPos()
@@ -114,7 +119,7 @@ module.exports = function(app) {
         },{
           path: 'environment.wind.angleTrueGround', value: TWA
         },{
-          path: 'navigation.trip.log', value: LOG
+          path: 'navigation.trip.log', value: actualTripLog() 
         }];
 
       app.handleMessage(plugin.id, {
