@@ -56,6 +56,8 @@ module.exports = function(app) {
 
     const knToMs = kn => (kn * 0.51444);
 
+    const nMToM = nm => (nm * 1852 );
+
     const getBoatInfo = async (options = {}) => {
       app.debug('Get vBoat informations');
       const res = await fetch('https://www.v-l-m.org/ws/boatinfo.php', {
@@ -84,6 +86,7 @@ module.exports = function(app) {
 	TWS = knToMs( resBody.TWS );
 	TWD = degToRad( resBody.TWD );
 	TWA = degToRad( resBody.TWA );
+	LOG = nMToM( resBody.LOC );
 
         //let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
 	//let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
@@ -110,6 +113,8 @@ module.exports = function(app) {
           path: 'environment.wind.directionTrue', value: TWD
         },{
           path: 'environment.wind.angleTrueGround', value: TWA
+        },{
+          path: 'navigation.trip.log', value: LOG
         }];
 
       app.handleMessage(plugin.id, {
