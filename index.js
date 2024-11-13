@@ -15,6 +15,7 @@
 
 
 module.exports = function(app) {
+  const version = '0.4.0'
   var plugin = {};
   var dataGet, dataPublish;
   var LAT, LON, SOG, COG, TWS, TWD, TWA, timestamp;
@@ -61,7 +62,7 @@ module.exports = function(app) {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Authorization': 'Basic ' + basicauth,
-	  'User-Agent': 'signalk-vlm/0.3.3',
+	  'User-Agent': 'signalk-vlm/' + version,
         },
         body: new URLSearchParams({
           forcefmt: 'json',
