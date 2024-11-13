@@ -27,6 +27,7 @@ module.exports = function(app) {
   plugin.schema = {
     type: 'object',
     required: ['login', 'password', 'boatid'],
+    description: 'Warning! In order not to overload the servers of https://www.v-l-m.org, only activate this plugin when you use it.',
     properties: {
       login: {
         type: "string",
