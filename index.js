@@ -18,7 +18,7 @@ module.exports = function(app) {
   const version = '0.5.0'
   var plugin = {};
   var dataGet, dataPublish;
-  var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, timestamp;
+  var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, timestamp;
 
   plugin.id = "signalk-vlm";
   plugin.name = "VLM";
