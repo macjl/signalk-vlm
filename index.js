@@ -17,7 +17,7 @@
 module.exports = function(app) {
   var plugin = {};
   var dataGet, dataPublish;
-  var LAT, LON, SOG, COG, TWS, TWD, TWA;
+  var LAT, LON, SOG, COG, TWS, TWD, TWA, timestamp;
 
   plugin.id = "signalk-vlm";
   plugin.name = "VLM";
@@ -74,6 +74,7 @@ module.exports = function(app) {
         const resBody = await res.json();
         app.debug(`Received: ${JSON.stringify(resBody)}`);
 
+	timestamp = Date.now();
 	LAT = resBody.LAT / 1000;
 	LON = resBody.LON / 1000;
 	SOG = knToMs( resBody.BSP );
@@ -87,9 +88,16 @@ module.exports = function(app) {
       }
     }
 
+    const actualPos = () => {
+      const dist = SOG * (Date.now() - timestamp) / 1000 / 1852
+      const dlat = dist / 60 * Math.cos(COG);
+      const dlon = dist / 60 * Math.sin(COG) / Math.cos(degToRad(LAT));
+      return { 'latitude': LAT + dlat, 'longitude': LON + dlon }
+    }
+
     const publishBoatInfo = () => {
       let values = [{
-          path: 'navigation.position', value: { 'latitude': LAT, 'longitude': LON } 
+          path: 'navigation.position', value: actualPos()
         },{
           path: 'navigation.speedOverGround', value: SOG
         },{
