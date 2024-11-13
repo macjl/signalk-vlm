@@ -18,7 +18,7 @@ module.exports = function(app) {
   const version = '0.4.2'
   var plugin = {};
   var dataGet, dataPublish;
-  var LAT, LON, SOG, COG, TWS, TWD, TWA, timestamp;
+  var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, timestamp;
 
   plugin.id = "signalk-vlm";
   plugin.name = "VLM";
@@ -89,6 +89,8 @@ module.exports = function(app) {
 	//TWA = degToRad( resBody.TWA );
 	TWA = degToRad( ( 180 + resBody.TWD - resBody.HDG) % 360 -180 );
 	LOG = nMToM( resBody.LOC );
+        AWA = Math.atan( TWS * Math.sin( TWA ) /( SOG + TWS * Math.cos( TWA ) ));
+        AWS = Math.sqrt( Math.pow(TWS * Math.sin( TWA ), 2) + Math.pow( SOG + TWS * Math.cos( TWA ), 2 ) );
 	PIM = resBody.PIM;
 	if (( PIM == 1 ) || ( PIM == 2 )) {
 	  PIT = degToRad(resBody.PIP);
@@ -100,8 +102,6 @@ module.exports = function(app) {
           }]
         });
 
-        //let AWA = Math.atan( TWS * Math.sin( TWA ), SOG + TWS * Math.cos( TWA ) );
-	//let AWS = Math.sqrt( ( TWS * Math.sin( TWA ) )^2 + ( SOG + TWS * Math.cos( TWA ) )^2 );
       }
     }
 
@@ -161,6 +161,10 @@ module.exports = function(app) {
           path: 'environment.wind.angleTrueGround', value: TWA
         },{
           path: 'navigation.trip.log', value: actualTripLog() 
+        },{
+          path: 'environment.wind.angleApparent', value: AWA
+        },{
+          path: 'environment.wind.speedApparent', value: AWS
         }];
       values = values.concat(piParms());
 
