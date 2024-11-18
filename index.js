@@ -15,7 +15,7 @@
 
 
 module.exports = function(app) {
-    const version = '0.5.1'
+    const version = '0.6.0'
     var plugin = {};
     var dataGet, dataPublish, dataSet;
     var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
