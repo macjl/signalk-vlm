@@ -19,6 +19,7 @@ module.exports = function(app) {
     var plugin = {};
     var dataGet, dataPublish, dataSet;
     var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
+    var RAC,IDU=0;
     var sWPLAT, sWPLON;
     let unsubscribes = [];
 
@@ -28,7 +29,7 @@ module.exports = function(app) {
 
     plugin.schema = {
       type: 'object',
-      required: ['login', 'password', 'boatid'],
+      required: ['login', 'password'],
       description: 'Warning! In order not to overload the servers of https://www.v-l-m.org, only activate this plugin when you use it.',
       properties: {
         login: {
@@ -39,10 +40,6 @@ module.exports = function(app) {
           type: "string",
           title: "Password"
         },
-        boatid: {
-          type: "number",
-          title: "Boat ID"
-        },
         setwp: {
           type: "boolean",
           title: "Set the VLM Wapypoint (experimental)",
@@ -52,7 +49,7 @@ module.exports = function(app) {
     }
 
     plugin.start = function(options) {
-      if ((!options.login) || (!options.password) || (!options.boatid)) {
+      if ((!options.login) || (!options.password)) {
         app.error('Login, password and boat# are required')
         return;
       }
@@ -102,7 +99,7 @@ module.exports = function(app) {
         } else if ( ( PIM == undefined ) || ( PIM < 3 ) ) {
           app.debug('Pilote mode should be Ortho, VMG or VBMG to set waypoint')
         } else {
-          let parms = "{\"pip\":{\"targetlat\":" + sWPLAT + ",\"targetlong\":" + sWPLON + ",\"targetandhdg\":-1},\"idu\":\"" + options.boatid + "\"}";
+          let parms = "{\"pip\":{\"targetlat\":" + sWPLAT + ",\"targetlong\":" + sWPLON + ",\"targetandhdg\":-1},\"idu\":\"" + IDU + "\"}";
           app.debug( 'New waypoint to VLM: ' + parms );
           const res = await fetch('https://www.v-l-m.org/ws/boatsetup/target_set.php', {
             method: 'POST',
@@ -113,7 +110,7 @@ module.exports = function(app) {
             },
             body: new URLSearchParams({
               forcefmt: 'json',
-              select_idu: options.boatid,
+              select_idu: IDU,
               parms: parms,
             }).toString()
           });
@@ -145,7 +142,7 @@ module.exports = function(app) {
           },
           body: new URLSearchParams({
             forcefmt: 'json',
-            select_idu: options.boatid,
+            select_idu: IDU,
           }).toString()
         });
         if (!res.ok) {
@@ -155,6 +152,8 @@ module.exports = function(app) {
           app.debug(`Received: ${JSON.stringify(resBody)}`);
 
           timestamp = Date.now();
+          IDU = resBody.IDU;
+          RAC = resBody.RAC;
           LAT = resBody.LAT / 1000;
           LON = resBody.LON / 1000;
           SOG = knToMs(resBody.BSP);
