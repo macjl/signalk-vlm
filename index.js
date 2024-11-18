@@ -17,8 +17,10 @@
 module.exports = function(app) {
     const version = '0.5.1'
     var plugin = {};
-    var dataGet, dataPublish;
-    var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, timestamp;
+    var dataGet, dataPublish, dataSet;
+    var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
+    var sWPLAT, sWPLON;
+    let unsubscribes = [];
 
     plugin.id = "signalk-vlm";
     plugin.name = "VLM";
@@ -41,6 +43,11 @@ module.exports = function(app) {
           type: "number",
           title: "Boat ID"
         },
+        setwp: {
+          type: "boolean",
+          title: "Set the VLM Wapypoint (experimental)",
+          default: false
+        }
       }
     }
 
@@ -58,8 +65,77 @@ module.exports = function(app) {
 
       const nMToM = nm => (nm * 1852);
 
-      const getBoatInfo = async (options = {}) => {
-        app.debug('Get vBoat informations');
+      const registerWpPath = () => {
+        app.debug("Registering to paths to set WP in VLM");
+        let localSubscription = {
+          context: '*',
+          subscribe: [{
+            path: 'navigation.course*.nextPoint.position',
+            period: 1000
+          }]
+        };
+        app.subscriptionmanager.subscribe(
+          localSubscription,
+          unsubscribes,
+          subscriptionError => {
+            app.error('Error:' + subscriptionError);
+          },
+          delta => {
+            delta.updates.forEach(u => {
+              if ( u.$source != "signalk-vlm" ) {
+                let wptarget=u["values"][0]["value"];
+                sWPLAT = wptarget["latitude"].toFixed(7);
+                sWPLON = wptarget["longitude"].toFixed(7);
+                app.debug("New WP Target received from SignalK: " + sWPLAT + "," + sWPLON);
+              }
+            });
+          }
+        );
+      }
+
+      const setBoatWP = async () => {
+        app.debug('Start set vBoat Waypoint routine');
+        if ( ( sWPLAT == undefined ) || ( sWPLON == undefined ) ) {
+          app.debug('No new waypoint to set');
+        } else if ( ( sWPLAT == WPLAT ) && ( sWPLON == WPLON ) ) {
+          app.debug('Same waypoint already set');
+        } else if ( ( PIM == undefined ) || ( PIM < 3 ) ) {
+          app.debug('Pilote mode should be Ortho, VMG or VBMG to set waypoint')
+        } else {
+          let parms = "{\"pip\":{\"targetlat\":" + sWPLAT + ",\"targetlong\":" + sWPLON + ",\"targetandhdg\":-1},\"idu\":\"" + options.boatid + "\"}";
+          app.debug( 'New waypoint to VLM: ' + parms );
+          const res = await fetch('https://www.v-l-m.org/ws/boatsetup/target_set.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': 'Basic ' + basicauth,
+              'User-Agent': 'signalk-vlm/' + version,
+            },
+            body: new URLSearchParams({
+              forcefmt: 'json',
+              select_idu: options.boatid,
+              parms: parms,
+            }).toString()
+          });
+          if (!res.ok) {
+            app.error(`Failed to set boat WP to VLM: HTTP ${res.status} ${res.statusText}`);
+          } else {
+            const resBody = await res.json();
+            app.debug(`Received: ${JSON.stringify(resBody)}`);
+            if ( resBody.success == true ) {
+              WPLON = sWPLON;
+              WPLAT = sWPLAT;
+              sWPLON = undefined;
+              sWPLAT = undefined;
+            } else {
+              app.error(`Error setting waypoint: ${JSON.stringify(resBody)}`);
+            }
+          }
+        }
+      }
+
+      const getBoatInfo = async () => {
+        app.debug('Start Get vBoat informations routine');
         const res = await fetch('https://www.v-l-m.org/ws/boatinfo.php', {
           method: 'POST',
           headers: {
@@ -94,6 +170,9 @@ module.exports = function(app) {
           PIM = resBody.PIM;
           if ((PIM == 1) || (PIM == 2)) {
             PIT = degToRad(resBody.PIP);
+          } else {
+            WPLAT = resBody.PIP.split("@")[0].split(",")[0];
+            WPLON = resBody.PIP.split("@")[0].split(",")[1];
           }
 
           app.handleMessage(plugin.id, {
@@ -104,7 +183,6 @@ module.exports = function(app) {
               }]
             }]
           });
-
         }
       }
 
@@ -113,8 +191,8 @@ module.exports = function(app) {
         const dlat = dist / 60 * Math.cos(COG);
         const dlon = dist / 60 * Math.sin(COG) / Math.cos(degToRad(LAT));
         return {
+          'longitude': LON + dlon,
           'latitude': LAT + dlat,
-          'longitude': LON + dlon
         }
       }
 
@@ -162,6 +240,16 @@ module.exports = function(app) {
             value: "vbvmg"
           }, ]);
 
+        if (PIM > 2) {
+          let pos = {
+            'longitude': WPLON,
+            'latitude': WPLAT,
+          }
+          piparms = piparms.concat([{
+            path: 'navigation.courseGreatCircle.nextPoint.position',
+            value: pos,
+          }, ]);
+        }
         return piparms
       }
 
@@ -206,11 +294,19 @@ module.exports = function(app) {
       getBoatInfo();
       dataGet = setInterval(getBoatInfo, 300 * 1000);
       dataPublish = setInterval(publishBoatInfo, 1 * 1000);
+
+      if (options.setwp){
+        dataSet = setInterval(setBoatWP, 10 * 1000);
+        registerWpPath();
+      }
     }
 
     plugin.stop = function() {
       clearInterval(dataGet);
+      clearInterval(dataSet);
       clearInterval(dataPublish);
+      unsubscribes.forEach(f => f());
+      unsubscribes = [];
       app.setPluginStatus('Pluggin stopped');
     };
 
