@@ -18,7 +18,7 @@ module.exports = function(app) {
     const version = '0.6.0'
     var plugin = {};
     var dataGet, dataPublish, dataGetOther, dataPublishOther;
-    var MMSI, LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
+    var MMSI, LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, NUP, VAC, timestamp;
     var RAC,IDU=0;
     let unsubscribes = [];
     let otherBoats = [];
@@ -88,6 +88,8 @@ module.exports = function(app) {
         const sog = distance / timeInSeconds * 1000; // SOG en m/s
         return sog ;
       }
+
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
 
       const basicauth = btoa(options.login + ':' + options.password);
 
@@ -208,7 +210,8 @@ module.exports = function(app) {
             WPLAT = resBody.PIP.split("@")[0].split(",")[0];
             WPLON = resBody.PIP.split("@")[0].split(",")[1];
           }
-
+          NUP = resBody.NUP;
+          VAC = resBody.VAC;
           app.handleMessage(plugin.id, {
             updates: [{
               values: [{
@@ -423,18 +426,24 @@ module.exports = function(app) {
 
       await getBoatInfo();
       publishBoatInfo();
-      dataGet = setInterval(getBoatInfo, 300 * 1000);
       dataPublish = setInterval(publishBoatInfo, 1 * 1000);
 
       if (options.ais){
         await getOtherBoats();
         publishOtherBoats();
-        dataGetOther = setInterval(getOtherBoats, 300 * 1000);
-        dataPublishOther = setInterval(publishOtherBoats, 15 * 1000);
+        dataPublishOther = setInterval(publishOtherBoats, 20 * 1000);
       }
 
       if (options.setwp){
         registerWpPath();
+      }
+
+      await sleep((NUP + 1) * 1000);
+      getBoatInfo();
+      dataGet = setInterval(getBoatInfo, VAC * 1000);
+      if (options.ais){
+        getOtherBoats();
+        dataGetOther = setInterval(getOtherBoats, VAC * 1000);
       }
     }
 
