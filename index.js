@@ -17,11 +17,12 @@
 module.exports = function(app) {
     const version = '0.6.0'
     var plugin = {};
-    var dataGet, dataPublish, dataSet;
+    var dataGet, dataPublish, dataSet, dataGetOther, dataPublishOther;
     var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
     var RAC,IDU=0;
     var sWPLAT, sWPLON;
     let unsubscribes = [];
+    let otherBoats = [];
 
     plugin.id = "signalk-vlm";
     plugin.name = "VLM";
@@ -48,10 +49,40 @@ module.exports = function(app) {
       }
     }
 
-    plugin.start = function(options) {
+    plugin.start = async function(options) {
       if ((!options.login) || (!options.password)) {
         app.error('Login, password and boat# are required')
         return;
+      }
+
+      // Fonction pour calculer la distance entre deux positions GPS
+      function haversineDistance(lat1, lon1, lat2, lon2) {
+        const dLat = degToRad(lat2 - lat1);
+        const dLon = degTorad(lon2 - lon1);
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return 6371000 * c; // distance en mètres
+      }
+
+      // Fonction pour calculer le COG (Course Over Ground)
+      function calculateCOG(lat1, lon1, lat2, lon2) {
+        const dLon = degToRad(lon2 - lon1);
+        const y = Math.sin(dLon) * Math.cos(degToRad(lat2));
+        const x = Math.cos(degToRad(lat1)) * Math.sin(degToRad(lat2)) -
+          Math.sin(degToRad(lat1)) * Math.cos(degToRad(lat2)) * Math.cos(dLon);
+        let cog = Math.atan2(y, x); // COG en radians
+        if (cog < 0) {
+          cog += 2 * Math.PI ;
+        }
+        return cog; // COG en rad
+      }
+
+      // Fonction pour calculer le SOG (Speed Over Ground)
+      function calculateSOG(distance, timeInSeconds) {
+        const sog = distance / timeInSeconds * 1000; // SOG en m/s
+        return sog ;
       }
 
       const basicauth = btoa(options.login + ':' + options.password);
@@ -124,12 +155,14 @@ module.exports = function(app) {
               WPLAT = sWPLAT;
               sWPLON = undefined;
               sWPLAT = undefined;
+              getBoatInfo();
             } else {
               app.error(`Error setting waypoint: ${JSON.stringify(resBody)}`);
             }
           }
         }
       }
+
 
       const getBoatInfo = async () => {
         app.debug('Start Get vBoat informations routine');
@@ -177,12 +210,103 @@ module.exports = function(app) {
           app.handleMessage(plugin.id, {
             updates: [{
               values: [{
-                path: 'name',
-                value: resBody.IDB
+                path: '',
+                value: {name: resBody.IDB}
               }]
             }]
           });
         }
+      }
+
+      const getOtherBoats = async () => {
+        app.debug('Start Get Other vBoat informations routine');
+        const res = await fetch('https://www.v-l-m.org/ws/raceinfo/ranking.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Basic ' + basicauth,
+            'User-Agent': 'signalk-vlm/' + version,
+          },
+          body: new URLSearchParams({
+            forcefmt: 'json',
+            idr: RAC,
+          }).toString()
+        });
+        if (!res.ok) {
+          app.error(`Failed to get other boat info from VLM: HTTP ${res.status} ${res.statusText}`);
+        } else {
+          const resBody = await res.json();
+          ranks = resBody.ranking;
+          //app.debug(`Received: ${JSON.stringify(ranks)}`);
+          for (var rank in ranks) {
+            const ts = Date.now();
+            const boatname = ranks[rank].boatname;
+            const latitude = ranks[rank].latitude;
+            const longitude = ranks[rank].longitude;
+            const country = ranks[rank].country.toString();
+            const loch = nMToM(ranks[rank].loch);
+            const mmsi = (999999999 - rank ).toString();
+            var cog,sog;
+            if (otherBoats[mmsi] != undefined) {
+              const distance = haversineDistance(otherBoats[mmsi].latitude, otherBoats[mmsi].longitude, latitude, longitude);
+              cog = calculateCOG(otherBoats[mmsi].latitude, otherBoats[mmsi].longitude, latitude, longitude);
+              sog = calculateSOG(distance, ts - otherBoats[mmsi].ts);
+            } else {
+              sog = 0;
+              cog = 0;
+            }
+            otherBoats[mmsi] = {
+              name: boatname,
+              latitude: latitude,
+              longitude: longitude,
+              flag: country,
+              trip: loch,
+              mmsi: mmsi,
+              cog: cog,
+              sog: sog,
+              ts: ts,
+            };
+          }
+        }
+      }
+
+      const publishOtherBoats = () => {
+          for ( var boat in otherBoats ) {
+            app.handleMessage(plugin.id, {
+              context: 'vessels.urn:mrn:signalk:uuid:' + otherBoats[boat].mmsi,
+              updates: [{
+                values:
+                  [{
+                    path: 'sensors.ais.class',
+                    value: "B",
+                  },{
+                    path: 'navigation.speedOverGround',
+                    value: otherBoats[boat].sog,
+                  },{
+                    path: 'navigation.courseOverGroundTrue',
+                    value: otherBoats[boat].cog,
+                  },{
+                    path: '',
+                    value: { name: otherBoats[boat].name},
+                  },{
+                    path: '',
+                    value: { mmsi: otherBoats[boat].mmsi },
+                  },{
+                    path: 'navigation.trip.log',
+                    value: otherBoats[boat].trip,
+                  },{
+                    path: '',
+                    value: { flag: otherBoats[boat].flag }
+                  },{
+                    path: 'navigation.position',
+                    value: {
+                      latitude: otherBoats[boat].latitude,
+                      longitude: otherBoats[boat].longitude,
+                    }
+                }]
+              }]
+            });
+          }
       }
 
       const actualPos = () => {
@@ -254,6 +378,9 @@ module.exports = function(app) {
 
       const publishBoatInfo = () => {
         let values = [{
+          path: '',
+          value: { mmsi: (999999999-IDU).toString() }
+        }, {
           path: 'navigation.position',
           value: actualPos()
         }, {
@@ -290,9 +417,15 @@ module.exports = function(app) {
         });
       }
 
-      getBoatInfo();
+      await getBoatInfo();
+      publishBoatInfo();
       dataGet = setInterval(getBoatInfo, 300 * 1000);
       dataPublish = setInterval(publishBoatInfo, 1 * 1000);
+
+      await getOtherBoats();
+      publishOtherBoats();
+      dataGetOther = setInterval(getOtherBoats, 300 * 1000);
+      dataPublishOther = setInterval(publishOtherBoats, 15 * 1000);
 
       if (options.setwp){
         dataSet = setInterval(setBoatWP, 10 * 1000);
@@ -302,8 +435,10 @@ module.exports = function(app) {
 
     plugin.stop = function() {
       clearInterval(dataGet);
+      clearInterval(dataGetOther);
       clearInterval(dataSet);
       clearInterval(dataPublish);
+      clearInterval(dataPublishOther);
       unsubscribes.forEach(f => f());
       unsubscribes = [];
       app.setPluginStatus('Pluggin stopped');
