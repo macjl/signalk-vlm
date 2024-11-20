@@ -17,10 +17,9 @@
 module.exports = function(app) {
     const version = '0.6.0'
     var plugin = {};
-    var dataGet, dataPublish, dataSet, dataGetOther, dataPublishOther;
-    var LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
+    var dataGet, dataPublish, dataGetOther, dataPublishOther;
+    var MMSI, LAT, LON, SOG, COG, TWS, TWD, TWA, LOG, AWA, AWS, PIM, PIT, WPLON, WPLAT, timestamp;
     var RAC,IDU=0;
-    var sWPLAT, sWPLON;
     let unsubscribes = [];
     let otherBoats = [];
 
@@ -45,6 +44,11 @@ module.exports = function(app) {
           type: "boolean",
           title: "Set the VLM Wapypoint (experimental)",
           default: false
+        },
+        ais: {
+          type: "boolean",
+          title: "Show other boats in race as AIS target",
+          default: false
         }
       }
     }
@@ -58,7 +62,7 @@ module.exports = function(app) {
       // Fonction pour calculer la distance entre deux positions GPS
       function haversineDistance(lat1, lon1, lat2, lon2) {
         const dLat = degToRad(lat2 - lat1);
-        const dLon = degTorad(lon2 - lon1);
+        const dLon = degToRad(lon2 - lon1);
         const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
           Math.cos(degToRad(lat1)) * Math.cos(degToRad(lat2)) *
           Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -112,20 +116,18 @@ module.exports = function(app) {
             delta.updates.forEach(u => {
               if ( u.$source != "signalk-vlm" ) {
                 let wptarget=u["values"][0]["value"];
-                sWPLAT = wptarget["latitude"].toFixed(7);
-                sWPLON = wptarget["longitude"].toFixed(7);
-                app.debug("New WP Target received from SignalK: " + sWPLAT + "," + sWPLON);
+                let sWPLAT = wptarget["latitude"].toFixed(7);
+                let sWPLON = wptarget["longitude"].toFixed(7);
+                setBoatWP(sWPLAT, sWPLON);
               }
             });
           }
         );
       }
 
-      const setBoatWP = async () => {
-        app.debug('Start set vBoat Waypoint routine');
-        if ( ( sWPLAT == undefined ) || ( sWPLON == undefined ) ) {
-          app.debug('No new waypoint to set');
-        } else if ( ( sWPLAT == WPLAT ) && ( sWPLON == WPLON ) ) {
+      const setBoatWP = async ( sWPLAT, sWPLON) => {
+        app.debug("New WP Target received from SignalK: " + sWPLAT + "," + sWPLON);
+        if ( ( sWPLAT == WPLAT ) && ( sWPLON == WPLON ) ) {
           app.debug('Same waypoint already set');
         } else if ( ( PIM == undefined ) || ( PIM < 3 ) ) {
           app.debug('Pilote mode should be Ortho, VMG or VBMG to set waypoint')
@@ -163,7 +165,6 @@ module.exports = function(app) {
         }
       }
 
-
       const getBoatInfo = async () => {
         app.debug('Start Get vBoat informations routine');
         const res = await fetch('https://www.v-l-m.org/ws/boatinfo.php', {
@@ -186,6 +187,7 @@ module.exports = function(app) {
 
           timestamp = Date.now();
           IDU = resBody.IDU;
+          MMSI = (999999999 - IDU).toString();
           RAC = resBody.RAC;
           LAT = resBody.LAT / 1000;
           LON = resBody.LON / 1000;
@@ -252,8 +254,8 @@ module.exports = function(app) {
               cog = calculateCOG(otherBoats[mmsi].latitude, otherBoats[mmsi].longitude, latitude, longitude);
               sog = calculateSOG(distance, ts - otherBoats[mmsi].ts);
             } else {
-              sog = 0;
-              cog = 0;
+              sog = SOG;
+              cog = COG;
             }
             otherBoats[mmsi] = {
               name: boatname,
@@ -272,40 +274,42 @@ module.exports = function(app) {
 
       const publishOtherBoats = () => {
           for ( var boat in otherBoats ) {
-            app.handleMessage(plugin.id, {
-              context: 'vessels.urn:mrn:signalk:uuid:' + otherBoats[boat].mmsi,
-              updates: [{
-                values:
-                  [{
-                    path: 'sensors.ais.class',
-                    value: "B",
-                  },{
-                    path: 'navigation.speedOverGround',
-                    value: otherBoats[boat].sog,
-                  },{
-                    path: 'navigation.courseOverGroundTrue',
-                    value: otherBoats[boat].cog,
-                  },{
-                    path: '',
-                    value: { name: otherBoats[boat].name},
-                  },{
-                    path: '',
-                    value: { mmsi: otherBoats[boat].mmsi },
-                  },{
-                    path: 'navigation.trip.log',
-                    value: otherBoats[boat].trip,
-                  },{
-                    path: '',
-                    value: { flag: otherBoats[boat].flag }
-                  },{
-                    path: 'navigation.position',
-                    value: {
-                      latitude: otherBoats[boat].latitude,
-                      longitude: otherBoats[boat].longitude,
-                    }
+            if ( boat != MMSI ) {
+              app.handleMessage(plugin.id, {
+                context: 'vessels.urn:mrn:signalk:uuid:' + otherBoats[boat].mmsi,
+                updates: [{
+                  values:
+                    [{
+                      path: 'sensors.ais.class',
+                      value: "B",
+                    },{
+                      path: 'navigation.speedOverGround',
+                      value: otherBoats[boat].sog,
+                    },{
+                      path: 'navigation.courseOverGroundTrue',
+                      value: otherBoats[boat].cog,
+                    },{
+                      path: '',
+                      value: { name: otherBoats[boat].name},
+                    },{
+                      path: '',
+                      value: { mmsi: otherBoats[boat].mmsi },
+                    },{
+                      path: 'navigation.trip.log',
+                      value: otherBoats[boat].trip,
+                    },{
+                      path: '',
+                      value: { flag: otherBoats[boat].flag }
+                    },{
+                      path: 'navigation.position',
+                      value: {
+                        latitude: otherBoats[boat].latitude,
+                        longitude: otherBoats[boat].longitude,
+                      }
+                  }]
                 }]
-              }]
-            });
+              });
+            }
           }
       }
 
@@ -379,7 +383,7 @@ module.exports = function(app) {
       const publishBoatInfo = () => {
         let values = [{
           path: '',
-          value: { mmsi: (999999999-IDU).toString() }
+          value: { mmsi: MMSI }
         }, {
           path: 'navigation.position',
           value: actualPos()
@@ -422,13 +426,14 @@ module.exports = function(app) {
       dataGet = setInterval(getBoatInfo, 300 * 1000);
       dataPublish = setInterval(publishBoatInfo, 1 * 1000);
 
-      await getOtherBoats();
-      publishOtherBoats();
-      dataGetOther = setInterval(getOtherBoats, 300 * 1000);
-      dataPublishOther = setInterval(publishOtherBoats, 15 * 1000);
+      if (options.ais){
+        await getOtherBoats();
+        publishOtherBoats();
+        dataGetOther = setInterval(getOtherBoats, 300 * 1000);
+        dataPublishOther = setInterval(publishOtherBoats, 15 * 1000);
+      }
 
       if (options.setwp){
-        dataSet = setInterval(setBoatWP, 10 * 1000);
         registerWpPath();
       }
     }
@@ -436,7 +441,6 @@ module.exports = function(app) {
     plugin.stop = function() {
       clearInterval(dataGet);
       clearInterval(dataGetOther);
-      clearInterval(dataSet);
       clearInterval(dataPublish);
       clearInterval(dataPublishOther);
       unsubscribes.forEach(f => f());
