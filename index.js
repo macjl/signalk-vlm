@@ -42,7 +42,7 @@ module.exports = function(app) {
         },
         setwp: {
           type: "boolean",
-          title: "Set the VLM Wapypoint (experimental)",
+          title: "Set received waypoints to VLM",
           default: false
         },
         ais: {
