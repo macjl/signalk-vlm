@@ -4,7 +4,10 @@
   "description": "Plugin for SignalK to retrieve your Virtual Boat datas from Virtual Loup-de-Mer (https://www.v-l-m.org)",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node -e \"require('.')\""
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",
